@@ -68,9 +68,30 @@ int INE5412_FS::fs_delete(int inumber)
 	return 0;
 }
 
-int INE5412_FS::fs_getsize(int inumber)
-{
-	return -1;
+int INE5412_FS::fs_getsize(int inumber) {
+    // Verifica se o sistema de arquivos está montado
+
+    // Calcula o número do bloco do inodo
+    int blockNumber = 1 + inumber / INODES_PER_BLOCK;
+
+    // Calcula o índice dentro do bloco
+    int indexInBlock = inumber % INODES_PER_BLOCK;
+
+    // Lê o bloco do inodo
+    union fs_block block;
+    disk->read(blockNumber, block.data);
+
+    // Obtém o inodo específico do bloco
+    fs_inode inode = block.inode[indexInBlock];
+
+    // Verifica se o inodo é válido
+    if (inode.isvalid != 1) {
+        // Inodo inválido, retorne erro
+        return -1;
+    }
+
+    // Retorna o tamanho lógico do inodo
+    return inode.size;
 }
 
 int INE5412_FS::fs_read(int inumber, char *data, int length, int offset)
