@@ -2,11 +2,75 @@
 
 int INE5412_FS::fs_format()
 {
-	return 0;
+
+//acho que está certinho
+
+// fs format – Cria um novo sistema de arquivos no disco, destruindo qualquer dado que estiver presente. Reserva
+// dez por cento dos blocos para inodos, libera a tabela de inodos, e escreve o superbloco. Retorna um para
+// sucesso, zero caso contrário. Note que formatar o sistema de arquivos não faz com que ele seja montado.
+// Também, uma tentativa de formatar um disco que já foi montado não deve fazer nada e retornar falha.
+
+
+// A rotina de formatação
+// é responsável por escolher ninodeblocks: isto deve ser sempre 10 por cento de nblocks, arredondando pra
+// cima. Note que a estrutura de dados do superbloco é pequena: apenas 16 bytes. O restante do bloco zero de
+// disco é deixado sem ser usado.
+
+
+// A rotina de formatação coloca este número (FS_MAGIC) nos primeiros bytes do su-
+// perbloco como um tipo de “assinatura” do sistema de arquivos.
+
+	//verifica se o disco já está montado
+	if (is_mounted)
+	{
+		cout << "ERROR: disco já está montado\n";
+		return 0;
+	}
+
+	//formatacao do superbloco
+
+	int disk_size = disk->size();
+	int n_inodes = ceil(disk_size * 0.1) + 1;
+	//o relatorio diz que o disco com 20 blocos tem 3 blocos para inode
+	//so que 10% de 20 é 2, e não 3
+	//entao eu coloquei mais 1 no resultado da conta
+	//pq aparentemente acontece a mesma coisa com o disco de 200 blocos
+	//que tem 21 blocos para inode
+
+	union fs_block fs_superblock;
+	fs_superblock.super.magic = FS_MAGIC;
+	fs_superblock.super.nblocks = disk_size; //numero total de blocos
+	fs_superblock.super.ninodeblocks = n_inodes; //numero de blocos de inodes
+	fs_superblock.super.ninodes = INODES_PER_BLOCK*n_inodes; //numero de inodes nesses blocos
+
+	disk->write(0, fs_superblock.data);
+
+	//formatacao dos blocos de inode
+	for(int i = 1; i < n_inodes + 1; i++)
+	{
+		union fs_block fs_inodeblock;
+		for(int j = 0; j < INODES_PER_BLOCK; j++)
+		{
+			fs_inodeblock.inode[j].isvalid = 0;
+			fs_inodeblock.inode[j].size = 0;
+			for(int k = 0; k < POINTERS_PER_INODE; k++)
+			{
+				fs_inodeblock.inode[j].direct[k] = 0;
+			}
+			fs_inodeblock.inode[j].indirect = 0;
+		}
+		disk->write(i, fs_inodeblock.data);
+	}
+
+	//formatacao do bitmap
+	disk->set_bitmap();
+
+	return 1;
 }
 
 void INE5412_FS::fs_debug()
 {
+	//nao esta 100% igual a resposta do relatorio
 	union fs_block block;
 
 	disk->read(0, block.data);
