@@ -111,7 +111,89 @@ void INE5412_FS::fs_debug()
 
 int INE5412_FS::fs_mount()
 {
-	return 0;
+
+//verificar os resultados
+
+// fs mount - Examina o disco para um sistema de arquivos. Se um está presente, lê o superbloco, constroi um
+// bitmap de blocos livres, e prepara o sistema de arquivos para uso. Retorna um em caso de sucesso, zero
+// caso contrário. Note que uma montagem bem-sucedida é um pré-requisito para as outras chamadas.
+
+// O primeiro campo é sempre o número
+// “mágico” FS MAGIC (0xf0f03410). A rotina de formatação coloca este número nos primeiros bytes do su-
+// perbloco como um tipo de “assinatura” do sistema de arquivos. Quando o sistema de arquivos é montado, o
+// SO procura por este número mágico. Se estiver correto, então assume-se que o disco contém um sistema de
+// arquivos correto. Se algum outro número estiver presente, então a montagem falha, talvez porque o disco não
+// esteja formatado ou contém algum outro tipo de dado.
+
+// O que acontece quando memória é perdida? Suponha que o usuário faça algumas mudanças no sistema de
+// arquivos SimpleFS, e então dê reboot no sistema. Sem um bitmap de blocos livres, o SimpleFS não consegue
+// dizer quais blocos estão em uso e quais estão livres. Felizmente, esta informação pode ser recuperada lendo o
+// disco. Cada vez que um sistema de arquivos SimpleFS é montado, o sistema deve construir um novo bitmap de
+// blocos livres do zero varrendo por todos os inodos e gravando quais blocos estão em uso. (Isto é muito parecido
+// com realizar um fsck toda vez que o sistema inicializa).
+
+	//verifica se o disco já está montado
+	if (is_mounted)
+	{
+		cout << "ERROR: disco já está montado\n";
+		return 0;
+	}
+
+	//verifica se ha um sistema de arquivos valido
+	union fs_block fs_superblock;
+	disk->read(0, fs_superblock.data);
+	if (fs_superblock.super.magic != FS_MAGIC)
+	{
+		cout << "ERROR: disco não possui um sistema de arquivos valido\n";
+		return 0;
+	}
+
+	//construcao do bitmap
+	disk->set_bitmap();
+
+	union fs_block block;
+	disk->read(0, block.data);
+	int n_blocks = block.super.ninodeblocks;
+
+	//debug
+	// for (int a = 0; a < int(disk->bitmap.size()); a++)
+	// {
+	// 	cout << disk->bitmap[a] << " ";
+	// }
+	// cout << "\n";
+
+	for(int i = 0; i < n_blocks; i++) {
+		disk->read(i + 1, block.data);
+		for(int j = 0; j < INODES_PER_BLOCK; j++) {
+			if(block.inode[j].isvalid) {
+				for(int k = 0; k < POINTERS_PER_INODE; k++) {
+					if(block.inode[j].direct[k] != 0) {
+						disk->bitmap[block.inode[j].direct[k]] = 1;
+					}
+				}
+				if(block.inode[j].indirect != 0) {
+					disk->bitmap[block.inode[j].indirect] = 1;
+					disk->read(block.inode[j].indirect, block.data);
+					for(int k = 0; k < POINTERS_PER_BLOCK; k++) {
+						if(block.pointers[k] != 0) {
+							disk->bitmap[block.pointers[k]] = 1;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	//debug
+	// for (int a = 0; a < int(disk->bitmap.size()); a++)
+	// {
+	// 	cout << disk->bitmap[a] << " ";
+	// }
+	// cout << "\n";
+
+	is_mounted = true;
+
+	return 1;
 }
 
 int INE5412_FS::fs_create()
