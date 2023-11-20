@@ -204,7 +204,79 @@ int INE5412_FS::fs_create()
 
 int INE5412_FS::fs_delete(int inumber)
 {
-	return 0;
+// fs delete – Deleta o inodo indicado pelo inúmero. Libera todo o dado e blocos indiretos atribuı́dos a este
+// inodo e os retorna ao mapa de blocos livres. Em caso de sucesso, retorna um. Em caso de falha, retorna
+// 0.
+
+	union fs_block block;
+
+	// Verifica se o sistema de arquivos está montado
+	if(!is_mounted || inumber <= 0 || inumber >= block.super.ninodes) {
+		// Sistema de arquivos não montado, retorne erro
+		cout << "ERROR: disco não está montado ou houve problemas de índice.\n";
+		return 0;
+	}
+
+	// Cálculo dos índices de bloco e inode
+	int blockNumber = 1 + inumber / INODES_PER_BLOCK;
+	int indexInBlock = inumber % INODES_PER_BLOCK;
+
+	// Lê o bloco do inodo
+	disk->read(blockNumber, block.data);
+
+	// Obtém o inodo específico do bloco
+	fs_inode inode = block.inode[indexInBlock];
+
+	// Verifica se o inodo é válido
+	if (!inode.isvalid) {
+		// Inodo inválido, retorne erro
+		cout << "ERROR: inodo inválido.\n";
+		return 0;
+	}
+
+	// Libera os blocos diretos
+	for (int i = 0; i < POINTERS_PER_INODE; i++) {
+		// Obtém o número do bloco
+		int blockNumber = inode.direct[i];
+
+		// Verifica se o bloco é válido
+		if (blockNumber != 0) {
+			// Libera o bloco
+			disk->bitmap[blockNumber] = 0;
+		}
+	}
+
+	// Libera o bloco indireto
+	if (inode.indirect != 0) {
+		// Lê o bloco indireto
+		union fs_block indirectBlock;
+		disk->read(inode.indirect, indirectBlock.data);
+
+		// Libera os blocos indiretos
+		for (int i = 0; i < POINTERS_PER_BLOCK; i++) {
+			// Obtém o número do bloco
+			int blockNumber = indirectBlock.pointers[i];
+
+			// Verifica se o bloco é válido
+			if (blockNumber != 0) {
+				// Libera o bloco
+				disk->bitmap[blockNumber] = 0;
+			}
+		}
+
+		// Libera o bloco indireto
+		disk->bitmap[inode.indirect] = 0;
+	}
+
+	// Libera o inodo
+	block.inode[indexInBlock].isvalid = 0;
+
+	// Escreve o bloco de volta no disco
+	disk->write(blockNumber, block.data);
+
+	// Retorna sucesso
+
+	return 1;
 }
 
 int INE5412_FS::fs_getsize(int inumber)
