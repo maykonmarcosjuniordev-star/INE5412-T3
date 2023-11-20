@@ -1,18 +1,20 @@
 #include "fs.h"
 #include <cmath>
 
-// fs format – Cria um novo sistema de arquivos no disco, destruindo qualquer dado que estiver presente. Reserva
-// dez por cento dos blocos para inodos, libera a tabela de inodos, e escreve o superbloco. Retorna um para
-// sucesso, zero caso contrário. Note que formatar o sistema de arquivos não faz com que ele seja montado.
+// Cria um novo sistema de arquivos no disco, destruindo qualquer dado que estiver presente.
+// Reserva dez por cento dos blocos para inodos, libera a tabela de inodos, e escreve o superbloco.
+// Retorna um para sucesso, zero caso contrário.
+// Note que formatar o sistema de arquivos não faz com que ele seja montado.
 // Também, uma tentativa de formatar um disco que já foi montado não deve fazer nada e retornar falha.
-// A rotina de formatação
-// é responsável por escolher ninodeblocks: isto deve ser sempre 10 por cento de nblocks, arredondando pra
-// cima. Note que a estrutura de dados do superbloco é pequena: apenas 16 bytes. O restante do bloco zero de
-// disco é deixado sem ser usado.
-// A rotina de formatação coloca este número (FS_MAGIC) nos primeiros bytes do su-
-// perbloco como um tipo de “assinatura” do sistema de arquivos.
 int INE5412_FS::fs_format()
 {
+	// A rotina de formatação
+	// é responsável por escolher ninodeblocks: isto deve ser sempre 10 por cento de nblocks,
+	// arredondando pra cima.
+	// Note que a estrutura de dados do superbloco é pequena: apenas 16 bytes.
+	// O restante do bloco zero de disco é deixado sem ser usado.
+	// A rotina de formatação coloca este número (FS_MAGIC) nos primeiros bytes do
+	// superbloco como um tipo de “assinatura” do sistema de arquivos.
 
 	// verifica se o disco já está montado
 	if (is_mounted)
@@ -22,7 +24,6 @@ int INE5412_FS::fs_format()
 	}
 
 	// formatacao do superbloco
-
 	int disk_size = disk->size();
 	int n_inodes = std::ceil(disk_size * 0.1) + 1;
 
@@ -121,7 +122,7 @@ int INE5412_FS::fs_mount()
 	// Se estiver correto, então assume-se que o disco contém um sistema de
 	// arquivos correto. Se algum outro número estiver presente, então a montagem falha, talvez porque o disco não
 	// esteja formatado ou contém algum outro tipo de dado.
-	
+
 	// O que acontece quando memória é perdida? Suponha que o usuário faça algumas mudanças no sistema de
 	// arquivos SimpleFS, e então dê reboot no sistema. Sem um bitmap de blocos livres, o SimpleFS não consegue
 	// dizer quais blocos estão em uso e quais estão livres. Felizmente, esta informação pode ser recuperada lendo o
