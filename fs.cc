@@ -109,18 +109,19 @@ void INE5412_FS::fs_debug()
 	}
 }
 
-// fs mount - Examina o disco para um sistema de arquivos. Se um está presente, lê o superbloco, constroi um
+// Examina o disco para um sistema de arquivos. Se um está presente, lê o superbloco, constroi um
 // bitmap de blocos livres, e prepara o sistema de arquivos para uso. Retorna um em caso de sucesso, zero
 // caso contrário. Note que uma montagem bem-sucedida é um pré-requisito para as outras chamadas.
-// O primeiro campo é sempre o número “mágico” FS MAGIC (0xf0f03410).
-// A rotina de formatação coloca este número nos primeiros bytes do superbloco
-// como um tipo de “assinatura” do sistema de arquivos.
-// Quando o sistema de arquivos é montado, o SO procura por este número mágico.
-// Se estiver correto, então assume-se que o disco contém um sistema de
-// arquivos correto. Se algum outro número estiver presente, então a montagem falha, talvez porque o disco não
-// esteja formatado ou contém algum outro tipo de dado.
 int INE5412_FS::fs_mount()
 {
+	// O primeiro campo é sempre o número “mágico” FS MAGIC (0xf0f03410).
+	// A rotina de formatação coloca este número nos primeiros bytes do superbloco
+	// como um tipo de “assinatura” do sistema de arquivos.
+	// Quando o sistema de arquivos é montado, o SO procura por este número mágico.
+	// Se estiver correto, então assume-se que o disco contém um sistema de
+	// arquivos correto. Se algum outro número estiver presente, então a montagem falha, talvez porque o disco não
+	// esteja formatado ou contém algum outro tipo de dado.
+	
 	// O que acontece quando memória é perdida? Suponha que o usuário faça algumas mudanças no sistema de
 	// arquivos SimpleFS, e então dê reboot no sistema. Sem um bitmap de blocos livres, o SimpleFS não consegue
 	// dizer quais blocos estão em uso e quais estão livres. Felizmente, esta informação pode ser recuperada lendo o
@@ -201,17 +202,20 @@ int INE5412_FS::fs_mount()
 	return 1;
 }
 
+// Cria um novo inodo de comprimento zero. Em caso de sucesso, retorna o in´umero (positivo).
+// Em caso de falha, retorna zero.
+// (Note que isto implica que zero não pode ser um inúmero válido)
 int INE5412_FS::fs_create()
 {
 	return 0;
 }
 
+// Deleta o inodo indicado pelo inúmero.
+// Libera todo o dado e blocos indiretos atribuı́dos a este
+// inodo e os retorna ao mapa de blocos livres.
+// Em caso de sucesso, retorna um. Em caso de falha, retorna 0.
 int INE5412_FS::fs_delete(int inumber)
 {
-	// fs delete – Deleta o inodo indicado pelo inúmero. Libera todo o dado e blocos indiretos atribuı́dos a este
-	// inodo e os retorna ao mapa de blocos livres. Em caso de sucesso, retorna um. Em caso de falha, retorna
-	// 0.
-
 	union fs_block block;
 
 	// Verifica se o sistema de arquivos está montado
@@ -290,6 +294,9 @@ int INE5412_FS::fs_delete(int inumber)
 	return 1;
 }
 
+// Retorna o tamanho lógico do inodo especificado, em bytes.
+// Note que zero é um tamanho lógico válido para um inodo!
+// Em caso de falha, retorna - 1
 int INE5412_FS::fs_getsize(int inumber)
 {
 	// Verifica se o sistema de arquivos está montado
@@ -318,11 +325,24 @@ int INE5412_FS::fs_getsize(int inumber)
 	return inode.size;
 }
 
+// Lê dado de um inodo válido.
+// Copia “length” bytes do inodo para dentro do ponteiro “data”, começando em “offset” no inodo.
+// Retorna o número total de bytes lidos.
+// O Número de bytes efetivamente lidos pode ser menos que o número de bytes requisitados,
+// caso o fim do inodo seja alcançado.
+// Se o inúmero dado for inválido, ou algum outro erro for encontrado, retorna 0.
 int INE5412_FS::fs_read(int inumber, char *data, int length, int offset)
 {
 	return 0;
 }
 
+// Escreve dado para um inodo v´alido.
+// Copia “length” bytes do ponteiro “data” para o inodo começando em “offset” bytes.
+// Aloca quaisquer blocos diretos e indiretos no processo.
+// Retorna o número de bytes efetivamente escritos.
+// O número de bytes efetivamente escritos pode ser menor que o número de
+// bytes requisitados, caso o disco se torne cheio.
+// Se o inúmero dado for inválido, ou qualquer outro erro for encontrado, retorna 0.
 int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset)
 {
 	return 0;
