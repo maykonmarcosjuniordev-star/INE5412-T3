@@ -21,7 +21,6 @@ public:
     void read(int blocknum, char *data);
     void write(int blocknum, const char *data);
     void close();
-    void set_bitmap();
 
 private:
     void sanity_check(int blocknum, const void *data);

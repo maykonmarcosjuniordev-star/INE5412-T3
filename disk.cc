@@ -91,14 +91,3 @@ void Disk::close()
 		diskfile = 0;
 	}
 }
-
-void Disk::set_bitmap()
-{
-	bitmap.resize(nblocks + 1);
-	int bitmap_size = bitmap.size(); // indice 0 usado pelo superbloco
-	bitmap[0] = 1;
-	for (int i = 1; i < bitmap_size; i++)
-	{
-		bitmap[i] = 0;
-	}
-}

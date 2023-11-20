@@ -55,14 +55,13 @@ int INE5412_FS::fs_format()
 	}
 
 	// formatacao do bitmap
-	disk->set_bitmap();
+	set_bitmap(disk);
 
 	return 1;
 }
 
 void INE5412_FS::fs_debug()
 {
-	// nao esta 100% igual a resposta do relatorio
 	union fs_block block;
 
 	disk->read(0, block.data);
@@ -81,7 +80,8 @@ void INE5412_FS::fs_debug()
 
 		for (int j = 0; j < INODES_PER_BLOCK; j++)
 		{
-			if (block.inode[j].isvalid)
+			fs_inode inode = block.inode[j];
+			if (inode.isvalid)
 			{
 				cout << "inode " << i * INODES_PER_BLOCK + j << ":\n";
 				cout << "    size: " << block.inode[j].size << " bytes\n";
@@ -109,22 +109,18 @@ void INE5412_FS::fs_debug()
 	}
 }
 
+// fs mount - Examina o disco para um sistema de arquivos. Se um está presente, lê o superbloco, constroi um
+// bitmap de blocos livres, e prepara o sistema de arquivos para uso. Retorna um em caso de sucesso, zero
+// caso contrário. Note que uma montagem bem-sucedida é um pré-requisito para as outras chamadas.
+// O primeiro campo é sempre o número “mágico” FS MAGIC (0xf0f03410).
+// A rotina de formatação coloca este número nos primeiros bytes do superbloco
+// como um tipo de “assinatura” do sistema de arquivos.
+// Quando o sistema de arquivos é montado, o SO procura por este número mágico.
+// Se estiver correto, então assume-se que o disco contém um sistema de
+// arquivos correto. Se algum outro número estiver presente, então a montagem falha, talvez porque o disco não
+// esteja formatado ou contém algum outro tipo de dado.
 int INE5412_FS::fs_mount()
 {
-
-	// verificar os resultados
-
-	// fs mount - Examina o disco para um sistema de arquivos. Se um está presente, lê o superbloco, constroi um
-	// bitmap de blocos livres, e prepara o sistema de arquivos para uso. Retorna um em caso de sucesso, zero
-	// caso contrário. Note que uma montagem bem-sucedida é um pré-requisito para as outras chamadas.
-
-	// O primeiro campo é sempre o número
-	// “mágico” FS MAGIC (0xf0f03410). A rotina de formatação coloca este número nos primeiros bytes do su-
-	// perbloco como um tipo de “assinatura” do sistema de arquivos. Quando o sistema de arquivos é montado, o
-	// SO procura por este número mágico. Se estiver correto, então assume-se que o disco contém um sistema de
-	// arquivos correto. Se algum outro número estiver presente, então a montagem falha, talvez porque o disco não
-	// esteja formatado ou contém algum outro tipo de dado.
-
 	// O que acontece quando memória é perdida? Suponha que o usuário faça algumas mudanças no sistema de
 	// arquivos SimpleFS, e então dê reboot no sistema. Sem um bitmap de blocos livres, o SimpleFS não consegue
 	// dizer quais blocos estão em uso e quais estão livres. Felizmente, esta informação pode ser recuperada lendo o
@@ -149,7 +145,7 @@ int INE5412_FS::fs_mount()
 	}
 
 	// construcao do bitmap
-	disk->set_bitmap();
+	set_bitmap(disk);
 
 	union fs_block block;
 	disk->read(0, block.data);
@@ -330,4 +326,15 @@ int INE5412_FS::fs_read(int inumber, char *data, int length, int offset)
 int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset)
 {
 	return 0;
+}
+
+void INE5412_FS::set_bitmap(Disk *disk)
+{
+	disk->bitmap.resize(disk->size() + 1);
+	// indice 0 usado pelo superbloco
+	disk->bitmap[0] = 1;
+	for (std::size_t i = 1; i < disk->bitmap.size(); i++)
+	{
+		disk->bitmap[i] = 0;
+	}
 }
