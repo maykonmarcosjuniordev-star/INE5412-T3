@@ -166,6 +166,7 @@ int INE5412_FS::fs_mount()
 		disk->read(i + 1, block.data);
 		for(int j = 0; j < INODES_PER_BLOCK; j++) {
 			if(block.inode[j].isvalid) {
+				disk->bitmap[i + 1] = 1; //bloco de inode
 				for(int k = 0; k < POINTERS_PER_INODE; k++) {
 					if(block.inode[j].direct[k] != 0) {
 						disk->bitmap[block.inode[j].direct[k]] = 1;
