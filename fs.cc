@@ -112,34 +112,34 @@ void INE5412_FS::fs_debug()
 int INE5412_FS::fs_mount()
 {
 
-//verificar os resultados
+	// verificar os resultados
 
-// fs mount - Examina o disco para um sistema de arquivos. Se um está presente, lê o superbloco, constroi um
-// bitmap de blocos livres, e prepara o sistema de arquivos para uso. Retorna um em caso de sucesso, zero
-// caso contrário. Note que uma montagem bem-sucedida é um pré-requisito para as outras chamadas.
+	// fs mount - Examina o disco para um sistema de arquivos. Se um está presente, lê o superbloco, constroi um
+	// bitmap de blocos livres, e prepara o sistema de arquivos para uso. Retorna um em caso de sucesso, zero
+	// caso contrário. Note que uma montagem bem-sucedida é um pré-requisito para as outras chamadas.
 
-// O primeiro campo é sempre o número
-// “mágico” FS MAGIC (0xf0f03410). A rotina de formatação coloca este número nos primeiros bytes do su-
-// perbloco como um tipo de “assinatura” do sistema de arquivos. Quando o sistema de arquivos é montado, o
-// SO procura por este número mágico. Se estiver correto, então assume-se que o disco contém um sistema de
-// arquivos correto. Se algum outro número estiver presente, então a montagem falha, talvez porque o disco não
-// esteja formatado ou contém algum outro tipo de dado.
+	// O primeiro campo é sempre o número
+	// “mágico” FS MAGIC (0xf0f03410). A rotina de formatação coloca este número nos primeiros bytes do su-
+	// perbloco como um tipo de “assinatura” do sistema de arquivos. Quando o sistema de arquivos é montado, o
+	// SO procura por este número mágico. Se estiver correto, então assume-se que o disco contém um sistema de
+	// arquivos correto. Se algum outro número estiver presente, então a montagem falha, talvez porque o disco não
+	// esteja formatado ou contém algum outro tipo de dado.
 
-// O que acontece quando memória é perdida? Suponha que o usuário faça algumas mudanças no sistema de
-// arquivos SimpleFS, e então dê reboot no sistema. Sem um bitmap de blocos livres, o SimpleFS não consegue
-// dizer quais blocos estão em uso e quais estão livres. Felizmente, esta informação pode ser recuperada lendo o
-// disco. Cada vez que um sistema de arquivos SimpleFS é montado, o sistema deve construir um novo bitmap de
-// blocos livres do zero varrendo por todos os inodos e gravando quais blocos estão em uso. (Isto é muito parecido
-// com realizar um fsck toda vez que o sistema inicializa).
+	// O que acontece quando memória é perdida? Suponha que o usuário faça algumas mudanças no sistema de
+	// arquivos SimpleFS, e então dê reboot no sistema. Sem um bitmap de blocos livres, o SimpleFS não consegue
+	// dizer quais blocos estão em uso e quais estão livres. Felizmente, esta informação pode ser recuperada lendo o
+	// disco. Cada vez que um sistema de arquivos SimpleFS é montado, o sistema deve construir um novo bitmap de
+	// blocos livres do zero varrendo por todos os inodos e gravando quais blocos estão em uso. (Isto é muito parecido
+	// com realizar um fsck toda vez que o sistema inicializa).
 
-	//verifica se o disco já está montado
+	// verifica se o disco já está montado
 	if (is_mounted)
 	{
 		cout << "ERROR: disco já está montado\n";
 		return 0;
 	}
 
-	//verifica se ha um sistema de arquivos valido
+	// verifica se ha um sistema de arquivos valido
 	union fs_block fs_superblock;
 	disk->read(0, fs_superblock.data);
 	if (fs_superblock.super.magic != FS_MAGIC)
@@ -148,34 +148,43 @@ int INE5412_FS::fs_mount()
 		return 0;
 	}
 
-	//construcao do bitmap
+	// construcao do bitmap
 	disk->set_bitmap();
 
 	union fs_block block;
 	disk->read(0, block.data);
 	int n_blocks = block.super.ninodeblocks;
 
-	//debug
-	// for (int a = 0; a < int(disk->bitmap.size()); a++)
-	// {
-	// 	cout << disk->bitmap[a] << " ";
-	// }
-	// cout << "\n";
+	// debug
+	//  for (int a = 0; a < int(disk->bitmap.size()); a++)
+	//  {
+	//  	cout << disk->bitmap[a] << " ";
+	//  }
+	//  cout << "\n";
 
-	for(int i = 0; i < n_blocks; i++) {
+	for (int i = 0; i < n_blocks; i++)
+	{
 		disk->read(i + 1, block.data);
-		for(int j = 0; j < INODES_PER_BLOCK; j++) {
-			if(block.inode[j].isvalid) {
-				for(int k = 0; k < POINTERS_PER_INODE; k++) {
-					if(block.inode[j].direct[k] != 0) {
+		for (int j = 0; j < INODES_PER_BLOCK; j++)
+		{
+			if (block.inode[j].isvalid)
+			{
+				disk->bitmap[i + 1] = 1; // bloco de inode
+				for (int k = 0; k < POINTERS_PER_INODE; k++)
+				{
+					if (block.inode[j].direct[k] != 0)
+					{
 						disk->bitmap[block.inode[j].direct[k]] = 1;
 					}
 				}
-				if(block.inode[j].indirect != 0) {
+				if (block.inode[j].indirect != 0)
+				{
 					disk->bitmap[block.inode[j].indirect] = 1;
 					disk->read(block.inode[j].indirect, block.data);
-					for(int k = 0; k < POINTERS_PER_BLOCK; k++) {
-						if(block.pointers[k] != 0) {
+					for (int k = 0; k < POINTERS_PER_BLOCK; k++)
+					{
+						if (block.pointers[k] != 0)
+						{
 							disk->bitmap[block.pointers[k]] = 1;
 						}
 					}
@@ -184,12 +193,12 @@ int INE5412_FS::fs_mount()
 		}
 	}
 
-	//debug
-	// for (int a = 0; a < int(disk->bitmap.size()); a++)
-	// {
-	// 	cout << disk->bitmap[a] << " ";
-	// }
-	// cout << "\n";
+	// debug
+	//  for (int a = 0; a < int(disk->bitmap.size()); a++)
+	//  {
+	//  	cout << disk->bitmap[a] << " ";
+	//  }
+	//  cout << "\n";
 
 	is_mounted = true;
 
@@ -203,7 +212,86 @@ int INE5412_FS::fs_create()
 
 int INE5412_FS::fs_delete(int inumber)
 {
-	return 0;
+	// fs delete – Deleta o inodo indicado pelo inúmero. Libera todo o dado e blocos indiretos atribuı́dos a este
+	// inodo e os retorna ao mapa de blocos livres. Em caso de sucesso, retorna um. Em caso de falha, retorna
+	// 0.
+
+	union fs_block block;
+
+	// Verifica se o sistema de arquivos está montado
+	if (!is_mounted || inumber <= 0 || inumber >= block.super.ninodes)
+	{
+		// Sistema de arquivos não montado, retorne erro
+		cout << "ERROR: disco não está montado ou houve problemas de índice.\n";
+		return 0;
+	}
+
+	// Cálculo dos índices de bloco e inode
+	int blockNumber = 1 + inumber / INODES_PER_BLOCK;
+	int indexInBlock = inumber % INODES_PER_BLOCK;
+
+	// Lê o bloco do inodo
+	disk->read(blockNumber, block.data);
+
+	// Obtém o inodo específico do bloco
+	fs_inode inode = block.inode[indexInBlock];
+
+	// Verifica se o inodo é válido
+	if (!inode.isvalid)
+	{
+		// Inodo inválido, retorne erro
+		cout << "ERROR: inodo inválido.\n";
+		return 0;
+	}
+
+	// Libera os blocos diretos
+	for (int i = 0; i < POINTERS_PER_INODE; i++)
+	{
+		// Obtém o número do bloco
+		int blockNumber = inode.direct[i];
+
+		// Verifica se o bloco é válido
+		if (blockNumber != 0)
+		{
+			// Libera o bloco
+			disk->bitmap[blockNumber] = 0;
+		}
+	}
+
+	// Libera o bloco indireto
+	if (inode.indirect != 0)
+	{
+		// Lê o bloco indireto
+		union fs_block indirectBlock;
+		disk->read(inode.indirect, indirectBlock.data);
+
+		// Libera os blocos indiretos
+		for (int i = 0; i < POINTERS_PER_BLOCK; i++)
+		{
+			// Obtém o número do bloco
+			int blockNumber = indirectBlock.pointers[i];
+
+			// Verifica se o bloco é válido
+			if (blockNumber != 0)
+			{
+				// Libera o bloco
+				disk->bitmap[blockNumber] = 0;
+			}
+		}
+
+		// Libera o bloco indireto
+		disk->bitmap[inode.indirect] = 0;
+	}
+
+	// Libera o inodo
+	block.inode[indexInBlock].isvalid = 0;
+
+	// Escreve o bloco de volta no disco
+	disk->write(blockNumber, block.data);
+
+	// Retorna sucesso
+
+	return 1;
 }
 
 int INE5412_FS::fs_getsize(int inumber)

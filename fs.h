@@ -58,6 +58,10 @@ public:
 private:
     Disk *disk;
     bool is_mounted = false;
+
+private:
+    int inode_load(int inumber, INE5412_FS::fs_inode *inode);
+    void inode_save(int inumber, INE5412_FS::fs_inode *inode);
 };
 
 #endif
