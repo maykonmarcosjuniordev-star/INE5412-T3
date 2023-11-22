@@ -59,6 +59,7 @@ private:
     Disk *disk;
     bool is_mounted = false;
     void set_bitmap(Disk *disk);
+    int allocate_block();
 };
 
 #endif
