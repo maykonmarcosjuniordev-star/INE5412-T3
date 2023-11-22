@@ -107,11 +107,12 @@ void INE5412_FS::fs_debug()
 				{
 					cout << "    indirect block: " << block.inode[j].indirect << "\n";
 					cout << "    indirect data blocks: ";
-					disk->read(block.inode[j].indirect, block.data);
+					union fs_block indirect_block;
+					disk->read(block.inode[j].indirect, indirect_block.data);
 					for (int k = 0; k < POINTERS_PER_BLOCK; k++)
 					{
-						if (block.pointers[k] != 0)
-							cout << block.pointers[k] << " ";
+						if (indirect_block.pointers[k] != 0)
+							cout << indirect_block.pointers[k] << " ";
 					}
 					cout << "\n";
 				}
