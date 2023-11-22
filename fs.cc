@@ -19,6 +19,7 @@ int INE5412_FS::fs_format()
 	// verifica se o disco já está montado
 	if (is_mounted)
 	{
+		// debug
 		cout << "ERROR: disco já está montado\n";
 		return 0;
 	}
@@ -63,6 +64,15 @@ int INE5412_FS::fs_format()
 
 void INE5412_FS::fs_debug()
 {
+	// Verifica se o sistema de arquivos está montado
+	if (!is_mounted)
+	{
+		// debug
+		// Sistema de arquivos não montado, retorne erro
+		cout << "ERROR: disco não está montado.\n";
+		return;
+	}
+
 	union fs_block block;
 
 	disk->read(0, block.data);
@@ -133,6 +143,7 @@ int INE5412_FS::fs_mount()
 	// verifica se o disco já está montado
 	if (is_mounted)
 	{
+		// debug
 		cout << "ERROR: disco já está montado\n";
 		return 0;
 	}
@@ -208,7 +219,54 @@ int INE5412_FS::fs_mount()
 // (Note que isto implica que zero não pode ser um inúmero válido)
 int INE5412_FS::fs_create()
 {
-	return 0;
+	// Verifica se o sistema de arquivos está montado
+	if (!is_mounted)
+	{
+		// debug
+		// Sistema de arquivos não montado, retorne erro
+		cout << "ERROR: disco não está montado.\n";
+		return 0;
+	}
+
+	// Procura por um inodo livre
+	union fs_block block;
+	disk->read(0, block.data);
+
+	int inumber = 0;
+	for (int i = 0; i < block.super.ninodeblocks; i++)
+	{
+		// Lê o bloco de inodos
+		union fs_block inode_block;
+		disk->read(i + 1, inode_block.data);
+
+		// Procura por um inodo livre
+		for (int j = 1; j < INODES_PER_BLOCK+1; j++)
+		{
+			fs_inode inode = inode_block.inode[j];
+			// Verifica se o inodo está livre
+			if (inode.isvalid == 0)
+			{
+				inumber = i * INODES_PER_BLOCK + j;
+				inode.isvalid = 1;
+				inode.indirect = 0;
+				inode.size = 0;
+				for (int k = 0; k < POINTERS_PER_INODE; k++)
+				{
+					inode.direct[k] = 0;
+				}
+				inode_block.inode[j] = inode;
+				inode_block.inode[j].isvalid = 1;
+				disk->write(i + 1, inode_block.data);
+				break;
+			}
+		}
+		// Verifica se o inodo foi encontrado
+		if (inumber != 0)
+		{
+			break;
+		}
+	}
+	return inumber;
 }
 
 // Deleta o inodo indicado pelo inúmero.
@@ -218,10 +276,14 @@ int INE5412_FS::fs_create()
 int INE5412_FS::fs_delete(int inumber)
 {
 	union fs_block block;
+	disk->read(0, block.data);
+
+	int n_inodes = block.super.ninodes;
 
 	// Verifica se o sistema de arquivos está montado
-	if (!is_mounted || inumber <= 0 || inumber >= block.super.ninodes)
+	if (!is_mounted || inumber <= 0 || inumber >= n_inodes)
 	{
+		// debug
 		// Sistema de arquivos não montado, retorne erro
 		cout << "ERROR: disco não está montado ou houve problemas de índice.\n";
 		return 0;
@@ -240,6 +302,7 @@ int INE5412_FS::fs_delete(int inumber)
 	// Verifica se o inodo é válido
 	if (!inode.isvalid)
 	{
+		// debug
 		// Inodo inválido, retorne erro
 		cout << "ERROR: inodo inválido.\n";
 		return 0;
@@ -301,6 +364,13 @@ int INE5412_FS::fs_delete(int inumber)
 int INE5412_FS::fs_getsize(int inumber)
 {
 	// Verifica se o sistema de arquivos está montado
+	if (!is_mounted)
+	{
+		// debug
+		// Sistema de arquivos não montado, retorne erro
+		cout << "ERROR: disco não está montado.\n";
+		return -1;
+	}
 
 	// Calcula o número do bloco do inodo
 	int blockNumber = 1 + inumber / INODES_PER_BLOCK;
@@ -319,6 +389,7 @@ int INE5412_FS::fs_getsize(int inumber)
 	if (inode.isvalid != 1)
 	{
 		// Inodo inválido, retorne erro
+		cout << "ERROR: inodo inválido.\n";
 		return -1;
 	}
 
@@ -334,6 +405,14 @@ int INE5412_FS::fs_getsize(int inumber)
 // Se o inúmero dado for inválido, ou algum outro erro for encontrado, retorna 0.
 int INE5412_FS::fs_read(int inumber, char *data, int length, int offset)
 {
+	// Verifica se o sistema de arquivos está montado
+	if (!is_mounted)
+	{
+		// debug
+		// Sistema de arquivos não montado, retorne erro
+		cout << "ERROR: disco não está montado.\n";
+		return 0;
+	}
 	return 0;
 }
 
@@ -346,6 +425,15 @@ int INE5412_FS::fs_read(int inumber, char *data, int length, int offset)
 // Se o inúmero dado for inválido, ou qualquer outro erro for encontrado, retorna 0.
 int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset)
 {
+	// Verifica se o sistema de arquivos está montado
+	if (!is_mounted)
+	{
+		// debug
+		// Sistema de arquivos não montado, retorne erro
+		cout << "ERROR: disco não está montado.\n";
+		return 0;
+	}
+
 	return 0;
 }
 
