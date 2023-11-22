@@ -4,3 +4,4 @@ shell.o
 fs.o
 disk.o
 simplefs
+Testes.txt
