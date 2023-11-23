@@ -7,16 +7,14 @@
 // Retorna um para sucesso, zero caso contrário.
 // Note que formatar o sistema de arquivos não faz com que ele seja montado.
 // Também, uma tentativa de formatar um disco que já foi montado não deve fazer nada e retornar falha.
+// A rotina de formatação é responsável por escolher ninodeblocks:
+// isto deve ser sempre 10 por cento de nblocks, arredondando pra cima.
+// Note que a estrutura de dados do superbloco é pequena: apenas 16 bytes.
+// O restante do bloco zero de disco é deixado sem ser usado.
+// A rotina de formatação coloca este número (FS_MAGIC) nos primeiros bytes do
+// superbloco como um tipo de “assinatura” do sistema de arquivos.
 int INE5412_FS::fs_format()
 {
-	// A rotina de formatação
-	// é responsável por escolher ninodeblocks: isto deve ser sempre 10 por cento de nblocks,
-	// arredondando pra cima.
-	// Note que a estrutura de dados do superbloco é pequena: apenas 16 bytes.
-	// O restante do bloco zero de disco é deixado sem ser usado.
-	// A rotina de formatação coloca este número (FS_MAGIC) nos primeiros bytes do
-	// superbloco como um tipo de “assinatura” do sistema de arquivos.
-
 	// verifica se o disco já está montado
 	if (is_mounted)
 	{
@@ -96,15 +94,18 @@ void INE5412_FS::fs_debug()
 			{
 				cout << "inode " << i * INODES_PER_BLOCK + j << ":\n";
 				cout << "    size: " << block.inode[j].size << " bytes\n";
-				cout << "    direct blocks: ";
-				for (int k = 0; k < POINTERS_PER_INODE; k++)
+				if (block.inode[j].size > 0)
 				{
-					if (block.inode[j].direct[k] != 0)
+					cout << "    direct blocks: ";
+					for (int k = 0; k < POINTERS_PER_INODE; k++)
 					{
-						cout << block.inode[j].direct[k] << " ";
+						if (block.inode[j].direct[k] != 0)
+						{
+							cout << block.inode[j].direct[k] << " ";
+						}
 					}
+					cout << "\n";
 				}
-				cout << "\n";
 				if (block.inode[j].indirect != 0)
 				{
 					cout << "    indirect block: " << block.inode[j].indirect << "\n";
@@ -123,26 +124,20 @@ void INE5412_FS::fs_debug()
 	}
 }
 
-// Examina o disco para um sistema de arquivos. Se um está presente, lê o superbloco, constroi um
-// bitmap de blocos livres, e prepara o sistema de arquivos para uso. Retorna um em caso de sucesso, zero
-// caso contrário. Note que uma montagem bem-sucedida é um pré-requisito para as outras chamadas.
+// Examina o disco para um sistema de arquivos.
+// Se um está presente, lê o superbloco, constroi um bitmap
+// de blocos livres, e prepara o sistema de arquivos para uso.
+// Retorna 1 em caso de sucesso, 0 caso contrário.
+// Note que uma montagem bem-sucedida é um pré-requisito para as outras chamadas.
+// O primeiro campo é sempre o número “mágico” FS MAGIC (0xf0f03410).
+// A rotina de formatação coloca este número nos primeiros bytes do superbloco
+// como um tipo de “assinatura” do sistema de arquivos.
+// Quando o sistema de arquivos é montado, o SO procura por este número mágico.
+// Se estiver correto, então assume-se que o disco contém um sistema de
+// arquivos correto. Se algum outro número estiver presente, então a montagem falha,
+// talvez porque o disco não esteja formatado ou contém algum outro tipo de dado.
 int INE5412_FS::fs_mount()
 {
-	// O primeiro campo é sempre o número “mágico” FS MAGIC (0xf0f03410).
-	// A rotina de formatação coloca este número nos primeiros bytes do superbloco
-	// como um tipo de “assinatura” do sistema de arquivos.
-	// Quando o sistema de arquivos é montado, o SO procura por este número mágico.
-	// Se estiver correto, então assume-se que o disco contém um sistema de
-	// arquivos correto. Se algum outro número estiver presente, então a montagem falha, talvez porque o disco não
-	// esteja formatado ou contém algum outro tipo de dado.
-
-	// O que acontece quando memória é perdida? Suponha que o usuário faça algumas mudanças no sistema de
-	// arquivos SimpleFS, e então dê reboot no sistema. Sem um bitmap de blocos livres, o SimpleFS não consegue
-	// dizer quais blocos estão em uso e quais estão livres. Felizmente, esta informação pode ser recuperada lendo o
-	// disco. Cada vez que um sistema de arquivos SimpleFS é montado, o sistema deve construir um novo bitmap de
-	// blocos livres do zero varrendo por todos os inodos e gravando quais blocos estão em uso. (Isto é muito parecido
-	// com realizar um fsck toda vez que o sistema inicializa).
-
 	// verifica se o disco já está montado
 	if (is_mounted)
 	{
@@ -166,13 +161,6 @@ int INE5412_FS::fs_mount()
 	union fs_block block;
 	disk->read(0, block.data);
 	int n_blocks = block.super.ninodeblocks;
-
-	// debug
-	//  for (int a = 0; a < int(disk->bitmap.size()); a++)
-	//  {
-	//  	cout << disk->bitmap[a] << " ";
-	//  }
-	//  cout << "\n";
 
 	for (int i = 0; i < n_blocks; i++)
 	{
@@ -205,19 +193,13 @@ int INE5412_FS::fs_mount()
 		}
 	}
 
-	// debug
-	//  for (int a = 0; a < int(disk->bitmap.size()); a++)
-	//  {
-	//  	cout << disk->bitmap[a] << " ";
-	//  }
-	//  cout << "\n";
-
 	is_mounted = true;
 
 	return 1;
 }
 
-// Cria um novo inodo de comprimento zero. Em caso de sucesso, retorna o in´umero (positivo).
+// Cria um novo inodo de comprimento zero.
+// Em caso de sucesso, retorna o inúmero (positivo).
 // Em caso de falha, retorna zero.
 // (Note que isto implica que zero não pode ser um inúmero válido)
 int INE5412_FS::fs_create()
@@ -273,9 +255,10 @@ int INE5412_FS::fs_create()
 }
 
 // Deleta o inodo indicado pelo inúmero.
-// Libera todo o dado e blocos indiretos atribuı́dos a este
-// inodo e os retorna ao mapa de blocos livres.
-// Em caso de sucesso, retorna um. Em caso de falha, retorna 0.
+// Libera todo o dado e blocos indiretos atribuı́dos a
+// este inodo e os retorna ao mapa de blocos livres.
+// Em caso de sucesso, retorna 1.
+// Em caso de falha, retorna 0.
 int INE5412_FS::fs_delete(int inumber)
 {
 	union fs_block block;
@@ -363,7 +346,7 @@ int INE5412_FS::fs_delete(int inumber)
 
 // Retorna o tamanho lógico do inodo especificado, em bytes.
 // Note que zero é um tamanho lógico válido para um inodo!
-// Em caso de falha, retorna - 1
+// Em caso de falha, retorna -1
 int INE5412_FS::fs_getsize(int inumber)
 {
 	// Verifica se o sistema de arquivos está montado
@@ -512,23 +495,11 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset)
 		return 0;
 	}
 
-	// Verifica se o offset está dentro do tamanho do arquivo
-	if (offset >= inode.size)
-	{
-		return 0;
-	}
-
-	// Verifica se o offset mais tamanho excede o tamanho máximo do arquivo
-	if (offset + length > inode.size)
-	{
-		length = inode.size - offset;
-	}
-
 	int total_written = 0;
 	while (total_written < length)
 	{
-		int block_rel = offset / Disk::DISK_BLOCK_SIZE;
-		int pos_in_block = offset % Disk::DISK_BLOCK_SIZE;
+		int block_rel = (offset + total_written) / Disk::DISK_BLOCK_SIZE;
+		int pos_in_block = (offset + total_written) % Disk::DISK_BLOCK_SIZE;
 		int size_to_write = min(Disk::DISK_BLOCK_SIZE - pos_in_block, length - total_written);
 
 		int physical_block;
@@ -587,13 +558,12 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset)
 		disk->write(physical_block, data_block.data);
 
 		total_written += size_to_write;
-		offset += size_to_write;
 	}
 
 	// Atualiza o tamanho do inodo se necessário
-	if (inode.size < offset)
+	if (inode.size < offset + total_written)
 	{
-		inode.size = offset;
+		inode.size = offset + total_written;
 		disk->write(blockNumber, block.data);
 	}
 
