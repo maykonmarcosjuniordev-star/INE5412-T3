@@ -25,7 +25,7 @@ int INE5412_FS::fs_format()
 
 	// formatacao do superbloco
 	int disk_size = disk->size();
-	int n_inodes = std::ceil(disk_size * 0.1) + 1;
+	int n_inodes = std::ceil(disk_size * 0.1);
 
 	union fs_block fs_superblock;
 	fs_superblock.super.magic = FS_MAGIC;
@@ -162,6 +162,11 @@ int INE5412_FS::fs_mount()
 	disk->read(0, block.data);
 	int n_blocks = block.super.ninodeblocks;
 
+	for(int i = 0; i < n_blocks; i++)
+	{
+        disk->bitmap[i + 1] = 1;
+	} 
+
 	for (int i = 0; i < n_blocks; i++)
 	{
 		disk->read(i + 1, block.data);
@@ -169,7 +174,6 @@ int INE5412_FS::fs_mount()
 		{
 			if (block.inode[j].isvalid)
 			{
-				disk->bitmap[i + 1] = 1; // bloco de inode
 				for (int k = 0; k < POINTERS_PER_INODE; k++)
 				{
 					if (block.inode[j].direct[k] != 0)
@@ -194,7 +198,7 @@ int INE5412_FS::fs_mount()
 	}
 
 	is_mounted = true;
-
+	
 	return 1;
 }
 
@@ -293,6 +297,8 @@ int INE5412_FS::fs_delete(int inumber)
 		cout << "ERROR: inodo inválido.\n";
 		return 0;
 	}
+
+	inode.isvalid = 0;
 
 	// Libera os blocos diretos
 	for (int i = 0; i < POINTERS_PER_INODE; i++)
@@ -585,7 +591,7 @@ int INE5412_FS::allocate_block()
 
 void INE5412_FS::set_bitmap(Disk *disk)
 {
-	disk->bitmap.resize(disk->size() + 1);
+	disk->bitmap.resize(disk->size());
 	// indice 0 usado pelo superbloco
 	disk->bitmap[0] = 1;
 	for (std::size_t i = 1; i < disk->bitmap.size(); i++)
