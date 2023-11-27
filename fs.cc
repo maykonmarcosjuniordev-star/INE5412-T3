@@ -184,12 +184,13 @@ int INE5412_FS::fs_mount()
 				if (block.inode[j].indirect != 0)
 				{
 					disk->bitmap[block.inode[j].indirect] = 1;
-					disk->read(block.inode[j].indirect, block.data);
+					union fs_block indirect_block;
+					disk->read(block.inode[j].indirect, indirect_block.data);
 					for (int k = 0; k < POINTERS_PER_BLOCK; k++)
 					{
-						if (block.pointers[k] != 0)
+						if (indirect_block.pointers[k] != 0)
 						{
-							disk->bitmap[block.pointers[k]] = 1;
+							disk->bitmap[indirect_block.pointers[k]] = 1;
 						}
 					}
 				}
